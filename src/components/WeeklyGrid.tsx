@@ -1,12 +1,12 @@
 import React from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { DayIndex, ScheduledBlock } from "../hooks/useKronos";
+import { DayIndex, ScheduledBlock, TaskUrgency } from "../hooks/useKronos";
 import { Colors, LayoutConfig } from "../styles/app-themes";
 
 interface WeekDayColumn {
@@ -24,6 +24,17 @@ interface WeeklyGridProps {
 
 const HOURS = Array.from({ length: LayoutConfig.totalHours }, (_, i) => i);
 
+function getUrgencyColor(urgency: TaskUrgency): string {
+  switch (urgency) {
+    case "baja":
+      return Colors.urgencyLow;
+    case "media":
+      return Colors.urgencyMedium;
+    case "alta":
+      return Colors.urgencyHigh;
+  }
+}
+
 export const WeeklyGrid: React.FC<WeeklyGridProps> = ({
   weekDays,
   blocksByDay,
@@ -33,7 +44,6 @@ export const WeeklyGrid: React.FC<WeeklyGridProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Cabecera de días */}
       <View style={styles.headerRow}>
         <View style={styles.timeSpacer} />
         {weekDays.map((day) => (
@@ -44,14 +54,12 @@ export const WeeklyGrid: React.FC<WeeklyGridProps> = ({
         ))}
       </View>
 
-      {/* Cuerpo desplazable con las 24 horas */}
       <ScrollView
         style={styles.scrollArea}
         contentContainerStyle={{ height: columnTotalHeight + 24 }}
         showsVerticalScrollIndicator
       >
         <View style={[styles.gridBody, { height: columnTotalHeight }]}>
-          {/* Columna de horas (00:00 a 23:00) */}
           <View style={styles.timeColumn}>
             {HOURS.map((hour) => (
               <View
@@ -68,7 +76,6 @@ export const WeeklyGrid: React.FC<WeeklyGridProps> = ({
             ))}
           </View>
 
-          {/* Columnas de cada día */}
           {weekDays.map((day) => {
             const dayBlocks = blocksByDay[day.dayIndex] || [];
 
@@ -77,7 +84,6 @@ export const WeeklyGrid: React.FC<WeeklyGridProps> = ({
                 key={day.isoDate}
                 style={[styles.dayColumn, { height: columnTotalHeight }]}
               >
-                {/* Líneas horizontales por cada hora */}
                 {HOURS.map((hour) => (
                   <View
                     key={hour}
@@ -91,7 +97,6 @@ export const WeeklyGrid: React.FC<WeeklyGridProps> = ({
                   />
                 ))}
 
-                {/* Bloques de actividades */}
                 {dayBlocks.map((block) => {
                   const topPx =
                     (block.startMinutes / 60) * LayoutConfig.hourHeight;
@@ -113,6 +118,18 @@ export const WeeklyGrid: React.FC<WeeklyGridProps> = ({
                         },
                       ]}
                     >
+                      {block.activity.kind === "task" && (
+                        <View
+                          style={[
+                            styles.urgencyDot,
+                            {
+                              backgroundColor: getUrgencyColor(
+                                block.activity.urgency,
+                              ),
+                            },
+                          ]}
+                        />
+                      )}
                       <Text style={styles.blockTitle} numberOfLines={2}>
                         {block.activity.name}
                       </Text>
@@ -208,6 +225,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     zIndex: 2,
+  },
+  urgencyDot: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: "#FFFFFF",
   },
   blockTitle: {
     color: "#FFFFFF",

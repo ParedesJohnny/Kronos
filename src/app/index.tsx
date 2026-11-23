@@ -11,8 +11,11 @@ import { ActivityDetailModal } from "../components/ActivityDetailModal";
 import { ActivityModalForm } from "../components/ActivityModalForm";
 import { WeeklyGrid } from "../components/WeeklyGrid";
 import {
+  Activity,
   formatMinutesToDuration,
+  RoutineActivity,
   ScheduledBlock,
+  TaskActivity,
   useKronos,
 } from "../hooks/useKronos";
 import { Colors } from "../styles/app-themes";
@@ -25,18 +28,35 @@ export default function KronosHomeScreen() {
     blocksByDay,
     dailySummary,
     addActivity,
+    updateActivity,
     updateTaskStatus,
     deleteActivity,
   } = useKronos();
 
   const [isFormVisible, setIsFormVisible] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [selectedBlock, setSelectedBlock] = useState<ScheduledBlock | null>(
     null,
   );
 
+  const handleSaveForm = (
+    payload:
+      | Omit<TaskActivity, "id" | "color">
+      | Omit<RoutineActivity, "id" | "color">,
+    editingId?: string,
+  ) => {
+    if (editingId && editingActivity) {
+      return updateActivity({
+        ...payload,
+        id: editingId,
+        color: editingActivity.color,
+      } as Activity);
+    }
+    return addActivity(payload);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      {/* Encabezado principal */}
       <View style={styles.topBar}>
         <View>
           <Text style={styles.appTitle}>Kronos</Text>
@@ -45,13 +65,15 @@ export default function KronosHomeScreen() {
 
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => setIsFormVisible(true)}
+          onPress={() => {
+            setEditingActivity(null);
+            setIsFormVisible(true);
+          }}
         >
           <Text style={styles.addButtonText}>+ Actividad</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Navegación de semana */}
       <View style={styles.weekNavRow}>
         <TouchableOpacity
           style={styles.navBtn}
@@ -74,7 +96,6 @@ export default function KronosHomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Resumen diario de tiempo libre (24h) */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -91,24 +112,29 @@ export default function KronosHomeScreen() {
         ))}
       </ScrollView>
 
-      {/* Cuadrícula semanal */}
       <WeeklyGrid
         weekDays={weekDays}
         blocksByDay={blocksByDay}
         onSelectBlock={(block) => setSelectedBlock(block)}
       />
 
-      {/* Modal para crear rutina o tarea */}
       <ActivityModalForm
         visible={isFormVisible}
-        onClose={() => setIsFormVisible(false)}
-        onSave={addActivity}
+        initialActivity={editingActivity}
+        onClose={() => {
+          setIsFormVisible(false);
+          setEditingActivity(null);
+        }}
+        onSave={handleSaveForm}
       />
 
-      {/* Modal con detalle al tocar un bloque */}
       <ActivityDetailModal
         block={selectedBlock}
         onClose={() => setSelectedBlock(null)}
+        onEdit={(activity) => {
+          setEditingActivity(activity);
+          setIsFormVisible(true);
+        }}
         onDelete={deleteActivity}
         onChangeStatus={updateTaskStatus}
       />

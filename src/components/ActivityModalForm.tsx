@@ -1,34 +1,41 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    ActivityKind,
-    DayIndex,
-    RoutineActivity,
-    RoutineFrequency,
-    TaskActivity,
-    TaskStatus,
-    TaskUrgency,
-    toISODateString,
+  Activity,
+  ActivityKind,
+  DayIndex,
+  isValidISODate,
+  isValidTimeHHmm,
+  RoutineActivity,
+  RoutineFrequency,
+  TaskActivity,
+  TaskStatus,
+  TaskUrgency,
+  toISODateString,
 } from "../hooks/useKronos";
 import { Colors } from "../styles/app-themes";
 
+type CreatePayload =
+  | Omit<TaskActivity, "id" | "color">
+  | Omit<RoutineActivity, "id" | "color">;
+
 interface ActivityModalFormProps {
   visible: boolean;
+  initialActivity?: Activity | null;
   onClose: () => void;
   onSave: (
-    payload:
-      | Omit<TaskActivity, "id" | "color">
-      | Omit<RoutineActivity, "id" | "color">,
-  ) => void;
+    payload: CreatePayload,
+    editingId?: string,
+  ) => { ok: boolean; error?: string };
 }
 
 const DAYS_OPTIONS: { label: string; value: DayIndex }[] = [
@@ -46,19 +53,16 @@ const URGENCY_OPTIONS: TaskUrgency[] = ["baja", "media", "alta"];
 
 export const ActivityModalForm: React.FC<ActivityModalFormProps> = ({
   visible,
+  initialActivity = null,
   onClose,
   onSave,
 }) => {
   const todayISO = toISODateString(new Date());
 
-  // Paso 1: Elegir si es rutina o tarea
   const [kind, setKind] = useState<ActivityKind>("task");
-
-  // Campos comunes
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
-  // Campos de Tarea
   const [dueDate, setDueDate] = useState(todayISO);
   const [scheduledDate, setScheduledDate] = useState(todayISO);
   const [taskStartTime, setTaskStartTime] = useState("10:00");
@@ -66,17 +70,48 @@ export const ActivityModalForm: React.FC<ActivityModalFormProps> = ({
   const [status, setStatus] = useState<TaskStatus>("pendiente");
   const [urgency, setUrgency] = useState<TaskUrgency>("media");
 
-  // Campos de Rutina
   const [frequency, setFrequency] = useState<RoutineFrequency>("semanal");
   const [dayOfWeek, setDayOfWeek] = useState<DayIndex>(0);
   const [startTime, setStartTime] = useState("07:00");
   const [endTime, setEndTime] = useState("08:00");
 
-  const resetAndClose = () => {
-    setName("");
-    setDescription("");
-    onClose();
-  };
+  useEffect(() => {
+    if (!visible) return;
+
+    if (initialActivity) {
+      setKind(initialActivity.kind);
+      setName(initialActivity.name);
+      setDescription(initialActivity.description);
+
+      if (initialActivity.kind === "task") {
+        setDueDate(initialActivity.dueDate);
+        setScheduledDate(initialActivity.scheduledDate);
+        setTaskStartTime(initialActivity.startTime);
+        setDurationMinutes(String(initialActivity.durationMinutes));
+        setStatus(initialActivity.status);
+        setUrgency(initialActivity.urgency);
+      } else {
+        setFrequency(initialActivity.frequency);
+        setDayOfWeek(initialActivity.dayOfWeek);
+        setStartTime(initialActivity.startTime);
+        setEndTime(initialActivity.endTime);
+      }
+    } else {
+      setKind("task");
+      setName("");
+      setDescription("");
+      setDueDate(todayISO);
+      setScheduledDate(todayISO);
+      setTaskStartTime("10:00");
+      setDurationMinutes("60");
+      setStatus("pendiente");
+      setUrgency("media");
+      setFrequency("semanal");
+      setDayOfWeek(0);
+      setStartTime("07:00");
+      setEndTime("08:00");
+    }
+  }, [visible, initialActivity, todayISO]);
 
   const handleSubmit = () => {
     const trimmedName = name.trim();
@@ -85,7 +120,37 @@ export const ActivityModalForm: React.FC<ActivityModalFormProps> = ({
       return;
     }
 
+    let payload: CreatePayload;
+
     if (kind === "task") {
+      const cleanScheduledDate = scheduledDate.trim();
+      const cleanDueDate = dueDate.trim();
+      const cleanStartTime = taskStartTime.trim();
+
+      if (!isValidISODate(cleanScheduledDate)) {
+        Alert.alert(
+          "Fecha no válida",
+          "La fecha en la que se desea realizar no está bien ingresada. Usa el formato AAAA-MM-DD (ej. 2026-11-23).",
+        );
+        return;
+      }
+
+      if (!isValidISODate(cleanDueDate)) {
+        Alert.alert(
+          "Fecha no válida",
+          "La fecha de entrega no está bien ingresada. Usa el formato AAAA-MM-DD (ej. 2026-11-25).",
+        );
+        return;
+      }
+
+      if (!isValidTimeHHmm(cleanStartTime)) {
+        Alert.alert(
+          "Hora no válida",
+          "La hora de inicio no está bien ingresada. Usa el formato HH:mm de 24 horas (ej. 14:00).",
+        );
+        return;
+      }
+
       const parsedDuration = Number(durationMinutes);
       if (!parsedDuration || parsedDuration <= 0) {
         Alert.alert(
@@ -95,30 +160,50 @@ export const ActivityModalForm: React.FC<ActivityModalFormProps> = ({
         return;
       }
 
-      onSave({
+      payload = {
         kind: "task",
         name: trimmedName,
         description: description.trim(),
-        dueDate: dueDate.trim() || todayISO,
-        scheduledDate: scheduledDate.trim() || todayISO,
-        startTime: taskStartTime.trim() || "09:00",
+        dueDate: cleanDueDate,
+        scheduledDate: cleanScheduledDate,
+        startTime: cleanStartTime,
         durationMinutes: parsedDuration,
         status,
         urgency,
-      });
+      };
     } else {
-      onSave({
+      const cleanStartTime = startTime.trim();
+      const cleanEndTime = endTime.trim();
+
+      if (!isValidTimeHHmm(cleanStartTime) || !isValidTimeHHmm(cleanEndTime)) {
+        Alert.alert(
+          "Hora no válida",
+          "Las horas de inicio o fin no están bien ingresadas. Usa el formato HH:mm de 24 horas (ej. 07:00).",
+        );
+        return;
+      }
+
+      payload = {
         kind: "routine",
         name: trimmedName,
         description: description.trim(),
         frequency,
         dayOfWeek,
-        startTime: startTime.trim() || "07:00",
-        endTime: endTime.trim() || "08:00",
-      });
+        startTime: cleanStartTime,
+        endTime: cleanEndTime,
+      };
     }
 
-    resetAndClose();
+    const result = onSave(payload, initialActivity?.id);
+    if (!result.ok) {
+      Alert.alert(
+        "Horario ocupado",
+        result.error || "Ese horario ya está ocupado.",
+      );
+      return;
+    }
+
+    onClose();
   };
 
   return (
@@ -126,52 +211,56 @@ export const ActivityModalForm: React.FC<ActivityModalFormProps> = ({
       visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={resetAndClose}
+      onRequestClose={onClose}
     >
       <View style={styles.backdrop}>
         <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Nueva actividad</Text>
+          <Text style={styles.modalTitle}>
+            {initialActivity ? "Editar actividad" : "Nueva actividad"}
+          </Text>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Selector principal: Rutina o Tarea */}
-            <Text style={styles.sectionLabel}>¿Qué deseas crear?</Text>
-            <View style={styles.segmentedRow}>
-              <TouchableOpacity
-                style={[
-                  styles.segmentBtn,
-                  kind === "task" && styles.segmentBtnActive,
-                ]}
-                onPress={() => setKind("task")}
-              >
-                <Text
-                  style={[
-                    styles.segmentText,
-                    kind === "task" && styles.segmentTextActive,
-                  ]}
-                >
-                  Tarea (1 vez)
-                </Text>
-              </TouchableOpacity>
+            {!initialActivity && (
+              <>
+                <Text style={styles.sectionLabel}>¿Qué deseas crear?</Text>
+                <View style={styles.segmentedRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.segmentBtn,
+                      kind === "task" && styles.segmentBtnActive,
+                    ]}
+                    onPress={() => setKind("task")}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentText,
+                        kind === "task" && styles.segmentTextActive,
+                      ]}
+                    >
+                      Tarea (1 vez)
+                    </Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.segmentBtn,
-                  kind === "routine" && styles.segmentBtnActive,
-                ]}
-                onPress={() => setKind("routine")}
-              >
-                <Text
-                  style={[
-                    styles.segmentText,
-                    kind === "routine" && styles.segmentTextActive,
-                  ]}
-                >
-                  Rutina (Repetitiva)
-                </Text>
-              </TouchableOpacity>
-            </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.segmentBtn,
+                      kind === "routine" && styles.segmentBtnActive,
+                    ]}
+                    onPress={() => setKind("routine")}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentText,
+                        kind === "routine" && styles.segmentTextActive,
+                      ]}
+                    >
+                      Rutina (Repetitiva)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
 
-            {/* Nombre y Descripción */}
             <Text style={styles.fieldLabel}>Nombre</Text>
             <TextInput
               style={styles.input}
@@ -381,7 +470,7 @@ export const ActivityModalForm: React.FC<ActivityModalFormProps> = ({
           </ScrollView>
 
           <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={resetAndClose}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
               <Text style={styles.cancelText}>Cancelar</Text>
             </TouchableOpacity>
 

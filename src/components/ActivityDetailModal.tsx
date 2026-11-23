@@ -1,16 +1,17 @@
 import React from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
-    Activity,
-    formatMinutesToDuration,
-    ScheduledBlock,
-    TaskStatus,
+  Activity,
+  formatMinutesToDuration,
+  ScheduledBlock,
+  TaskStatus,
 } from "../hooks/useKronos";
 import { Colors } from "../styles/app-themes";
 
 interface ActivityDetailModalProps {
   block: ScheduledBlock | null;
   onClose: () => void;
+  onEdit: (activity: Activity) => void;
   onDelete: (activityId: string) => void;
   onChangeStatus: (activityId: string, status: TaskStatus) => void;
 }
@@ -28,6 +29,7 @@ const DAY_NAMES = [
 export const ActivityDetailModal: React.FC<ActivityDetailModalProps> = ({
   block,
   onClose,
+  onEdit,
   onDelete,
   onChangeStatus,
 }) => {
@@ -131,6 +133,16 @@ export const ActivityDetailModal: React.FC<ActivityDetailModalProps> = ({
                 <Text style={styles.deleteText}>Eliminar</Text>
               </TouchableOpacity>
 
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => {
+                  onClose();
+                  onEdit(activity);
+                }}
+              >
+                <Text style={styles.editText}>Editar</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
                 <Text style={styles.closeText}>Cerrar</Text>
               </TouchableOpacity>
@@ -215,7 +227,7 @@ const styles = StyleSheet.create({
   },
   footerRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
     marginTop: 20,
   },
   deleteBtn: {
@@ -228,6 +240,19 @@ const styles = StyleSheet.create({
   deleteText: {
     color: Colors.danger,
     fontWeight: "700",
+    fontSize: 13,
+  },
+  editBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 10,
+    backgroundColor: Colors.primaryLight,
+    alignItems: "center",
+  },
+  editText: {
+    color: Colors.primary,
+    fontWeight: "700",
+    fontSize: 13,
   },
   closeBtn: {
     flex: 1,
@@ -239,5 +264,6 @@ const styles = StyleSheet.create({
   closeText: {
     color: "#FFFFFF",
     fontWeight: "700",
+    fontSize: 13,
   },
 });

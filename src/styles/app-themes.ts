@@ -11,15 +11,18 @@ export const Colors = {
   dangerLight: "#FEF2F2",
   success: "#16A34A",
   warning: "#D97706",
+  urgencyLow: "#22C55E",
+  urgencyMedium: "#EAB308",
+  urgencyHigh: "#EF4444",
   blocks: [
-    "#E11D48", // Rosa / Carmesí
-    "#EA580C", // Naranja rojizo
-    "#0284C7", // Azul cielo
-    "#1D4ED8", // Azul intenso
-    "#6D28D9", // Morado
-    "#0F766E", // Verde azulado
-    "#BE185D", // Magenta
-    "#0369A1", // Azul petróleo
+    "#E11D48",
+    "#EA580C",
+    "#0284C7",
+    "#1D4ED8",
+    "#6D28D9",
+    "#0F766E",
+    "#BE185D",
+    "#0369A1",
   ],
 };
 
